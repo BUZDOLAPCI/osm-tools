@@ -30,6 +30,8 @@ function parseArgs(): { transport?: 'stdio' | 'http'; port?: number } {
         console.error(`Invalid port: ${args[i]}. Must be a number.`);
         process.exit(1);
       }
+    } else if (arg === '--stdio') {
+      result.transport = 'stdio';
     } else if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
@@ -54,6 +56,7 @@ USAGE:
 
 OPTIONS:
   -t, --transport <mode>  Transport mode: 'http' (default) or 'stdio'
+  --stdio                 Use stdio transport (shortcut for --transport stdio)
   -p, --port <number>     HTTP server port (default: 8080)
   -h, --help              Show this help message
   -v, --version           Show version
@@ -72,7 +75,7 @@ EXAMPLES:
   osm-tools
 
   # Start with stdio transport (for local MCP clients)
-  osm-tools --transport stdio
+  osm-tools --stdio
 `);
 }
 
