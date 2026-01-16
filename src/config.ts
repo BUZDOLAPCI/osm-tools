@@ -3,7 +3,6 @@
  */
 
 export interface Config {
-  transport: 'stdio' | 'http';
   httpPort: number;
   userAgent: string;
   throttleMs: number;
@@ -27,7 +26,6 @@ function getEnvNumber(key: string, defaultValue: number): number {
 
 export function loadConfig(): Config {
   return {
-    transport: getEnv('OSM_TRANSPORT', 'http') as 'stdio' | 'http',
     httpPort: getEnvNumber('OSM_HTTP_PORT', 8080),
     userAgent: getEnv('OSM_USER_AGENT', 'osm-tools-mcp/1.0.0'),
     throttleMs: getEnvNumber('OSM_THROTTLE_MS', 1000),

@@ -11,7 +11,7 @@ export { createServer } from './server.js';
 export { getConfig, setConfig, loadConfig, type Config } from './config.js';
 
 // Export transport utilities
-export { startStdioTransport, startHttpTransport } from './transport/index.js';
+export { startHttpTransport } from './transport/index.js';
 
 // Export tools
 export {

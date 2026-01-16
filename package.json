@@ -12,8 +12,6 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/cli.js",
-    "start:stdio": "node dist/cli.js --transport stdio",
-    "start:http": "node dist/cli.js --transport http",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

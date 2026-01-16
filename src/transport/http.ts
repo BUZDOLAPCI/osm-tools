@@ -1,11 +1,14 @@
-import { createServer as createHttpServer, IncomingMessage, ServerResponse } from 'http';
+import { createServer as createHttpServer, IncomingMessage, ServerResponse, Server as HttpServer } from 'http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { randomUUID } from 'crypto';
-import { getConfig } from '../config.js';
 
 // Store active sessions
 const sessions = new Map<string, { transport: StreamableHTTPServerTransport; server: Server }>();
+
+export interface HttpTransportOptions {
+  port?: number;
+}
 
 /**
  * Handle MCP requests at /mcp endpoint
@@ -66,11 +69,10 @@ function handleNotFound(res: ServerResponse): void {
 }
 
 /**
- * Start MCP server with HTTP transport using raw Node.js HTTP
+ * Create HTTP server with MCP endpoints but don't start listening.
+ * Useful for testing.
  */
-export async function startHttpTransport(createServerFn: () => Server): Promise<void> {
-  const config = getConfig();
-
+export function createMcpHttpServer(createServerFn: () => Server): HttpServer {
   const httpServer = createHttpServer();
 
   httpServer.on('request', async (req: IncomingMessage, res: ServerResponse) => {
@@ -88,10 +90,25 @@ export async function startHttpTransport(createServerFn: () => Server): Promise<
     }
   });
 
-  httpServer.listen(config.httpPort, () => {
-    console.error(`OSM Tools MCP Server listening on http://localhost:${config.httpPort}`);
-    console.error(`MCP endpoint: http://localhost:${config.httpPort}/mcp`);
-    console.error(`Health endpoint: http://localhost:${config.httpPort}/health`);
+  return httpServer;
+}
+
+/**
+ * Start MCP server with HTTP transport using raw Node.js HTTP
+ * This is the only supported transport for Dedalus deployment
+ */
+export async function startHttpTransport(
+  createServerFn: () => Server,
+  options: HttpTransportOptions = {}
+): Promise<HttpServer> {
+  const port = options.port ?? 8080;
+
+  const httpServer = createMcpHttpServer(createServerFn);
+
+  httpServer.listen(port, () => {
+    console.error(`OSM Tools MCP Server listening on http://localhost:${port}`);
+    console.error(`MCP endpoint: http://localhost:${port}/mcp`);
+    console.error(`Health endpoint: http://localhost:${port}/health`);
   });
 
   // Handle graceful shutdown
@@ -110,4 +127,6 @@ export async function startHttpTransport(createServerFn: () => Server): Promise<
 
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+
+  return httpServer;
 }
