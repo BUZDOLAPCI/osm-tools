@@ -53,8 +53,8 @@ USAGE:
   osm-tools [OPTIONS]
 
 OPTIONS:
-  -t, --transport <mode>  Transport mode: 'stdio' (default) or 'http'
-  -p, --port <number>     HTTP server port (default: 3000)
+  -t, --transport <mode>  Transport mode: 'http' (default) or 'stdio'
+  -p, --port <number>     HTTP server port (default: 8080)
   -h, --help              Show this help message
   -v, --version           Show version
 
@@ -68,11 +68,11 @@ ENVIRONMENT VARIABLES:
   OSM_OSRM_URL       OSRM API base URL
 
 EXAMPLES:
-  # Start with stdio transport (for MCP clients)
+  # Start with HTTP transport on default port 8080
   osm-tools
 
-  # Start with HTTP transport on port 8080
-  osm-tools --transport http --port 8080
+  # Start with stdio transport (for local MCP clients)
+  osm-tools --transport stdio
 `);
 }
 
