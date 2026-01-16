@@ -116,3 +116,11 @@ export function createServer(): Server {
 
   return server;
 }
+
+/**
+ * Create a standalone MCP server instance ready for HTTP transport
+ * This is the entry point for the Dedalus marketplace
+ */
+export function createStandaloneServer(): Server {
+  return createServer();
+}

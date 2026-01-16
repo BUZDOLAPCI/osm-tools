@@ -91,11 +91,13 @@ async function main(): Promise<void> {
   }
 
   const config = getConfig();
-  const server = createServer();
 
   if (config.transport === 'http') {
-    await startHttpTransport(server);
+    // Pass the factory function for HTTP transport (creates server per session)
+    await startHttpTransport(createServer);
   } else {
+    // For stdio, create a single server instance
+    const server = createServer();
     await startStdioTransport(server);
   }
 }

@@ -1,68 +1,110 @@
+import { createServer as createHttpServer, IncomingMessage, ServerResponse } from 'http';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import express, { Request, Response } from 'express';
+import { randomUUID } from 'crypto';
 import { getConfig } from '../config.js';
 
+// Store active sessions
+const sessions = new Map<string, { transport: StreamableHTTPServerTransport; server: Server }>();
+
 /**
- * Start MCP server with HTTP/SSE transport
+ * Handle MCP requests at /mcp endpoint
  */
-export async function startHttpTransport(server: Server): Promise<void> {
-  const config = getConfig();
-  const app = express();
+async function handleMcpRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  createServerFn: () => Server
+): Promise<void> {
+  // Parse session ID from query string
+  const url = new URL(req.url!, `http://${req.headers.host}`);
+  let sessionId = url.searchParams.get('sessionId');
 
-  app.use(express.json());
-
-  // Store active transports
-  const transports = new Map<string, SSEServerTransport>();
-
-  // SSE endpoint for MCP communication
-  app.get('/sse', async (req: Request, res: Response) => {
-    const sessionId = req.query.sessionId as string || crypto.randomUUID();
-
-    const transport = new SSEServerTransport('/messages', res);
-    transports.set(sessionId, transport);
-
-    res.on('close', () => {
-      transports.delete(sessionId);
+  // For new sessions (POST without session ID), create a new session
+  if (req.method === 'POST' && !sessionId) {
+    sessionId = randomUUID();
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => sessionId!,
     });
+    const server = createServerFn();
+
+    sessions.set(sessionId, { transport, server });
+
+    // Handle session close
+    transport.onclose = () => {
+      sessions.delete(sessionId!);
+    };
 
     await server.connect(transport);
-  });
+  }
 
-  // POST endpoint for client messages
-  app.post('/messages', async (req: Request, res: Response) => {
-    const sessionId = req.query.sessionId as string;
+  // Get existing session or use the newly created one
+  const session = sessions.get(sessionId!);
+  if (!session) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Invalid or missing session ID' }));
+    return;
+  }
 
-    if (!sessionId || !transports.has(sessionId)) {
-      res.status(400).json({ error: 'Invalid or missing session ID' });
-      return;
+  // Handle the request with raw Node.js objects (no third argument)
+  await session.transport.handleRequest(req, res);
+}
+
+/**
+ * Handle health check endpoint
+ */
+function handleHealthCheck(res: ServerResponse): void {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ status: 'ok', transport: 'http' }));
+}
+
+/**
+ * Handle 404 not found
+ */
+function handleNotFound(res: ServerResponse): void {
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: 'Not found' }));
+}
+
+/**
+ * Start MCP server with HTTP transport using raw Node.js HTTP
+ */
+export async function startHttpTransport(createServerFn: () => Server): Promise<void> {
+  const config = getConfig();
+
+  const httpServer = createHttpServer();
+
+  httpServer.on('request', async (req: IncomingMessage, res: ServerResponse) => {
+    const url = new URL(req.url!, `http://${req.headers.host}`);
+
+    switch (url.pathname) {
+      case '/mcp':
+        await handleMcpRequest(req, res, createServerFn);
+        break;
+      case '/health':
+        handleHealthCheck(res);
+        break;
+      default:
+        handleNotFound(res);
     }
-
-    const transport = transports.get(sessionId)!;
-
-    try {
-      await transport.handlePostMessage(req, res);
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to process message' });
-    }
   });
 
-  // Health check endpoint
-  app.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', transport: 'http' });
-  });
-
-  // Start HTTP server
-  const httpServer = app.listen(config.httpPort, () => {
+  httpServer.listen(config.httpPort, () => {
     console.error(`OSM Tools MCP Server listening on http://localhost:${config.httpPort}`);
-    console.error(`SSE endpoint: http://localhost:${config.httpPort}/sse`);
+    console.error(`MCP endpoint: http://localhost:${config.httpPort}/mcp`);
+    console.error(`Health endpoint: http://localhost:${config.httpPort}/health`);
   });
 
   // Handle graceful shutdown
   const shutdown = async () => {
     console.error('Shutting down...');
+
+    // Close all sessions
+    for (const [sessionId, session] of sessions) {
+      await session.server.close();
+      sessions.delete(sessionId);
+    }
+
     httpServer.close();
-    await server.close();
     process.exit(0);
   };
 
