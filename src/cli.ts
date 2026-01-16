@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import { createServer } from './server.js';
 import { startHttpTransport } from './transport/index.js';
 
 /**
@@ -73,7 +72,7 @@ async function main(): Promise<void> {
   const port = args.port ?? parseInt(process.env.OSM_HTTP_PORT ?? '8080', 10);
 
   // Always use HTTP transport
-  await startHttpTransport(createServer, { port });
+  await startHttpTransport({ port });
 }
 
 main().catch((error) => {
